@@ -1,0 +1,25 @@
+.tickets-page {
+    display: flex;
+    height: 100vh;
+    background-color: #61675a;
+}
+
+.tickets-content {
+    flex-grow: 1;
+    padding: 20px;
+    background-color: #363a2f;
+}
+
+.tickets-content h1 {
+    margin-bottom: 20px;
+}
+
+.tickets-content .table-container {
+    overflow-x: auto;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+
