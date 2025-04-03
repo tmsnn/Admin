@@ -5,8 +5,12 @@
     border-radius: 20px;
     padding: 5px 10px;
     width: 400px;
-    margin-left: 950px;
+
+    margin-left: auto;   /* автоматический отступ слева */
+    margin-right: 40px;  /* отступ от правого края */
+    margin-top: 30px;
 }
+
 
 .search-bar input {
     border: none;

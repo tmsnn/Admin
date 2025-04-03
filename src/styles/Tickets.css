@@ -1,25 +1,158 @@
 .tickets-page {
     display: flex;
     height: 100vh;
-    background-color: #61675a;
-}
-
-.tickets-content {
-    flex-grow: 1;
-    padding: 20px;
     background-color: #363a2f;
 }
 
-.tickets-content h1 {
-    margin-bottom: 20px;
+.tickets-content {
+    margin-left: 250px;
+    flex: 1;
+    padding: 40px 60px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    color: white;
 }
 
-.tickets-content .table-container {
-    overflow-x: auto;
+.tickets-header {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.pagination-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.pagination-controls label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: white;
+}
+
+.pagination-controls input,
+.pagination-controls select {
+    padding: 5px;
+    font-size: 14px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+.load-btn {
+    background-color: #7a9359;
+    color: white;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.load-btn:hover {
+    background-color: #5e7848;
+}
+
+.table-container {
     background: white;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
+    overflow-x: auto;
+    color: black;
 }
 
+.main-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Arial", sans-serif;
+    font-size: 14px;
+}
 
+.main-table th,
+.main-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.main-table th {
+    background-color: #7a9359;
+    color: white;
+    font-weight: bold;
+}
+
+.main-table tr:hover {
+    background-color: #f0f5ec;
+}
+
+/* Ограничение ширины колонок */
+.main-table th:nth-child(1),
+.main-table td:nth-child(1) {
+    max-width: 180px; /* ID */
+}
+
+.main-table th:nth-child(2),
+.main-table td:nth-child(2) {
+    max-width: 140px; /* Order Number */
+}
+
+.main-table th:nth-child(3),
+.main-table td:nth-child(3) {
+    max-width: 140px; /* Created At */
+}
+
+.main-table th:nth-child(4),
+.main-table td:nth-child(4) {
+    max-width: 80px; /* Price */
+}
+
+.main-table th:nth-child(5),
+.main-table td:nth-child(5) {
+    max-width: 180px; /* Route ID */
+}
+
+.main-table th:nth-child(6),
+.main-table td:nth-child(6) {
+    max-width: 120px; /* Status */
+}
+
+/* ✅ Сдвигаем User ID */
+.main-table th:nth-child(7),
+.main-table td:nth-child(7) {
+    max-width: 240px;
+    word-break: break-word;
+    padding-left: 20px;
+}
+
+.pagination-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.pagination-buttons button {
+    background-color: #7a9359;
+    color: white;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s ease;
+}
+
+.pagination-buttons button:hover:not(:disabled) {
+    background-color: #6a824f;
+}
+
+.pagination-buttons button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}

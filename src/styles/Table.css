@@ -1,26 +1,19 @@
 .table-container {
-    overflow-x: auto; /* Добавляет горизонтальный скролл */
-
-    background: #ffffff;
-    padding: 10px;
-    margin-left: 350px;
-    margin-top: 150px;
-    border-radius: 8px;
+    overflow-x: auto;
+    max-width: 100%;
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    margin-top: 20px;
+    width: 100%; /* растягивает контейнер под таблицу */
 }
 
 .main-table {
-    width: 80%;
-    min-width: 500px; /* Минимальная ширина таблицы */
+    width: 1400px; /* задаём фиксированную широкую ширину */
     border-collapse: collapse;
+    font-family: "Arial", sans-serif;
+    font-size: 14px;
+    table-layout: auto;
 }
 
-.main-table th, .main-table td {
-    padding: 8px;
-    border-bottom: 1px solid #6c7e65;
-    text-align: left;
-}
-
-.main-table th {
-    background-color: #697052;
-    color: white;
-}

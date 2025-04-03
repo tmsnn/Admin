@@ -1,286 +1,222 @@
 import React, { useEffect, useState } from "react";
-import Table from "../components/Table";
-import SearchBar from "../components/SearchBar";
 import Sidebar from "../components/Sidebar";
+import SearchBar from "../components/SearchBar";
+import Table from "../components/Table";
 import "../styles/Roads.css";
 
 export default function RoadsPage() {
-    // Локальный список маршрутов
     const [roads, setRoads] = useState([]);
     const [filteredRoads, setFilteredRoads] = useState([]);
-
-    // Поля для поиска (на сервере)
-    const [searchDeparture, setSearchDeparture] = useState("");
-    const [searchDestination, setSearchDestination] = useState("");
-    const [searchDate, setSearchDate] = useState("");
-    const [searchPassengers, setSearchPassengers] = useState("");
-
-    // Попапы (однократно объявляем все 3)
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(30);
+    const [totalCount, setTotalCount] = useState(0);
+    const [editRoute, setEditRoute] = useState(null);
     const [isAddPopupOpen, setIsAddPopupOpen] = useState(false);
-    const [isEditPopupOpen, setIsEditPopupOpen] = useState(false);
-    const [isDeletePopupOpen, setIsDeletePopupOpen] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
-    // Текущий маршрут (для редактирования / удаления)
-    const [currentRoad, setCurrentRoad] = useState(null);
-    const [roadToDelete, setRoadToDelete] = useState(null);
-
-    // Поля для создания нового маршрута
-    const [newRoad, setNewRoad] = useState({
+    const [newRoute, setNewRoute] = useState({
         bus_id: "",
         departure: "",
+        departure_location: "",
         destination: "",
+        destination_location: "",
         start_date: "2025-12-12T13:00:00+05:00",
-        end_date: "2025-12-12T13:00:00+05:00",
-        price: 0,
+        end_date: "2025-12-12T18:00:00+05:00",
+        price: "",
     });
 
-    // ================================
-    // 1) Загрузка списка (GET /api/routes) - убираем пустые query
-    // ================================
     useEffect(() => {
-        fetchRoutes();
+        fetchRoutes(page, pageSize);
     }, []);
 
-    async function fetchRoutes() {
+    const fetchRoutes = async (customPage = 1, customSize = 30) => {
         try {
             const token = localStorage.getItem("token");
-
-            // Не добавляем пустые query
-            const params = new URLSearchParams();
-            if (searchDeparture.trim()) params.set("departure", searchDeparture.trim());
-            if (searchDestination.trim()) params.set("destination", searchDestination.trim());
-            if (searchDate.trim()) params.set("date", searchDate.trim());
-            if (searchPassengers.trim()) {
-                params.set("passengers", searchPassengers.trim());
-            } else {
-                params.set("passengers", "1");
-            }
-            params.set("page", "1");
-            params.set("pageSize", "30");
-
-            const response = await fetch(`http://0.0.0.0:8080/api/routes?${params}`, {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
-                },
+            const params = new URLSearchParams({ page: customPage, pageSize: customSize });
+            const response = await fetch(`http://0.0.0.0:8080/api/all-routes?${params}`, {
+                headers: { Authorization: `Bearer ${token}` },
             });
-            if (!response.ok) {
-                throw new Error(`Ошибка загрузки маршрутов: ${response.status}`);
-            }
 
-            const data = await response.json();
-            console.log("маршруты:", data);
+            if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
 
-            // Если приходит двумерный массив
-            const flat = data.flat();
-            console.log("Преобразовано в одномер:", flat);
-
-            // Мапим в локальный формат
-            const mapped = flat.map((r) => ({
+            const total = parseInt(response.headers.get("X-Total-Count"), 10);
+            const rawData = await response.json();
+            const mapped = rawData.map((r) => ({
                 id: r.id,
                 from: r.departure,
                 to: r.destination,
+                departure_location: r.departure_location || "",
+                destination_location: r.destination_location || "",
                 date: r.start_date?.split("T")[0] || "",
-                time: r.start_date?.split("T")[1]?.slice(0,5) || "",
+                time: r.start_date?.split("T")[1]?.slice(0, 5) || "",
                 busId: r.bus_id,
                 availableSeats: r.available_seats?.toString() || "0",
                 price: r.price?.toString() || "0",
             }));
 
+            setTotalCount(total || mapped.length);
             setRoads(mapped);
             setFilteredRoads(mapped);
-        } catch (error) {
-            console.error("Ошибка при загрузке маршрутов:", error);
+        } catch (err) {
+            console.error("Ошибка при загрузке маршрутов:", err);
         }
-    }
+    };
 
-    // ================================
-    // 2) Поиск (локальный) по таблице
-    // ================================
-    function handleSearch(query) {
-        if (!query) {
-            setFilteredRoads(roads);
+    const handleSearch = async (query) => {
+        if (!query) return setFilteredRoads(roads);
+
+        const localFiltered = roads.filter((r) =>
+            Object.values(r).some((val) =>
+                val?.toString().toLowerCase().includes(query.toLowerCase())
+            )
+        );
+
+        if (localFiltered.length > 0) return setFilteredRoads(localFiltered);
+
+        try {
+            const token = localStorage.getItem("token");
+            const res = await fetch(`http://0.0.0.0:8080/api/routes/${query}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (res.ok) {
+                const result = await res.json();
+                setFilteredRoads([{
+                    id: result.id,
+                    from: result.departure,
+                    to: result.destination,
+                    departure_location: result.departure_location || "",
+                    destination_location: result.destination_location || "",
+                    date: result.start_date?.split("T")[0] || "",
+                    time: result.start_date?.split("T")[1]?.slice(0, 5) || "",
+                    busId: result.bus_id,
+                    availableSeats: result.available_seats?.toString() || "0",
+                    price: result.price?.toString() || "0",
+                }]);
+            } else {
+                setFilteredRoads([]);
+            }
+        } catch {
+            setFilteredRoads([]);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!confirmDeleteId) return;
+
+        try {
+            const token = localStorage.getItem("token");
+            const res = await fetch(`http://0.0.0.0:8080/api/routes/${confirmDeleteId}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (res.ok) {
+                const updated = roads.filter((r) => r.id !== confirmDeleteId);
+                setRoads(updated);
+                setFilteredRoads(updated);
+                setConfirmDeleteId(null);
+            }
+        } catch (error) {
+            console.error("Ошибка при удалении маршрута:", error);
+        }
+    };
+
+    const handleCreateRoute = async () => {
+        const {
+            bus_id, departure, departure_location,
+            destination, destination_location, start_date,
+            end_date, price
+        } = newRoute;
+
+        if (!bus_id || !departure || !departure_location ||
+            !destination || !destination_location || !start_date ||
+            !end_date || !price
+        ) {
+            alert("Please fill in all fields before submitting.");
             return;
         }
-        const lowerQuery = query.toLowerCase();
-        const filtered = roads.filter((road) =>
-            Object.values(road).some((val) => val?.toString().toLowerCase().includes(lowerQuery))
-        );
-        setFilteredRoads(filtered);
-    }
 
-    // Кнопка "Search" для перезапроса на сервер
-    function handleFetchRoutesClick() {
-        fetchRoutes();
-    }
-
-    // ================================
-    // 3) Добавление (POST /api/routes)
-    // ================================
-    function openAddPopup() {
-        setIsAddPopupOpen(true);
-    }
-    function closeAddPopup() {
-        setIsAddPopupOpen(false);
-        setNewRoad({
-            bus_id: "",
-            departure: "",
-            destination: "",
-            start_date: "2025-12-12T13:00:00+05:00",
-            end_date: "2025-12-12T13:00:00+05:00",
-            price: 0,
-        });
-    }
-
-    async function addRoute() {
         try {
-            // Проверяем, чтобы поля не были пустыми
-            if (!newRoad.bus_id || !newRoad.departure || !newRoad.destination ||
-                !newRoad.start_date || !newRoad.end_date) {
-                alert("Please fill all required fields (bus_id, departure, destination, start_date, end_date)!");
-                return;
-            }
-
             const token = localStorage.getItem("token");
             const response = await fetch("http://0.0.0.0:8080/api/routes", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
+                    Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                    bus_id: newRoad.bus_id,
-                    departure: newRoad.departure,
-                    destination: newRoad.destination,
-                    start_date: newRoad.start_date,
-                    end_date: newRoad.end_date,
-                    price: parseInt(newRoad.price, 10),
+                    bus_id,
+                    departure,
+                    departure_location,
+                    destination,
+                    destination_location,
+                    start_date,
+                    end_date,
+                    price: parseInt(price, 10),
                 }),
             });
-            if (!response.ok) {
-                throw new Error(`Ошибка создания маршрута: ${response.status}`);
-            }
-            const created = await response.json();
-            console.log("Создан маршрут:", created);
 
-            // Мапим к локальному виду
-            const mapped = {
-                id: created.id,
-                from: created.departure,
-                to: created.destination,
-                date: created.start_date?.split("T")[0] || "",
-                time: created.start_date?.split("T")[1]?.slice(0,5) || "",
-                busId: created.bus_id,
-                availableSeats: created.available_seats?.toString() || "0",
-                price: created.price?.toString() || "0",
+            if (!response.ok) throw new Error("Ошибка при создании маршрута");
+
+            alert("Route created successfully.");
+            setIsAddPopupOpen(false);
+            setNewRoute({
+                bus_id: "",
+                departure: "",
+                departure_location: "",
+                destination: "",
+                destination_location: "",
+                start_date: "2025-12-12T13:00:00+05:00",
+                end_date: "2025-12-12T18:00:00+05:00",
+                price: "",
+            });
+            fetchRoutes(page, pageSize);
+        } catch (error) {
+            alert(`Ошибка: ${error.message}`);
+        }
+    };
+
+    const handleEdit = (route) => setEditRoute({ ...route });
+
+    const handleUpdate = async () => {
+        if (!editRoute) return;
+        try {
+            const token = localStorage.getItem("token");
+            const body = {
+                bus_id: editRoute.busId,
+                departure: editRoute.from,
+                departure_location: editRoute.departure_location,
+                destination: editRoute.to,
+                destination_location: editRoute.destination_location,
+                price: parseInt(editRoute.price),
+                start_date: `${editRoute.date}T${editRoute.time}`,
+                end_date: `${editRoute.date}T${editRoute.time}`,
             };
-            const updated = [...roads, mapped];
-            setRoads(updated);
-            setFilteredRoads(updated);
 
-            closeAddPopup();
-        } catch (error) {
-            console.error("Ошибка при создании маршрута:", error);
-        }
-    }
-
-    // ================================
-    // 4) Редактирование (POST /api/routes/{id})
-    // ================================
-    function openEditPopup(road) {
-        setCurrentRoad({ ...road });
-        setIsEditPopupOpen(true);
-    }
-    function closeEditPopup() {
-        setIsEditPopupOpen(false);
-        setCurrentRoad(null);
-    }
-
-    async function saveChanges() {
-        try {
-            if (!currentRoad) return;
-            const token = localStorage.getItem("token");
-
-            // Проверяем, чтобы поля не были пустыми
-            if (!currentRoad.from || !currentRoad.to || !currentRoad.date || !currentRoad.time || !currentRoad.busId) {
-                alert("Please fill all required fields in Edit popup!");
-                return;
-            }
-
-            const response = await fetch(`http://0.0.0.0:8080/api/routes/${currentRoad.id}`, {
-                method: "POST", // сервер так сказал
+            const res = await fetch(`http://0.0.0.0:8080/api/routes/${editRoute.id}`, {
+                method: "PUT",
                 headers: {
+                    Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
                 },
-                body: JSON.stringify({
-                    bus_id: currentRoad.busId,
-                    departure: currentRoad.from,
-                    destination: currentRoad.to,
-                    start_date: currentRoad.date + "T" + currentRoad.time,
-                    end_date: currentRoad.date + "T" + currentRoad.time,
-                    price: parseInt(currentRoad.price, 10),
-                }),
+                body: JSON.stringify(body),
             });
-            if (!response.ok) {
-                throw new Error(`Ошибка обновления маршрута: ${response.status}`);
+
+            if (res.ok) {
+                alert("Route updated successfully.");
+                setEditRoute(null);
+                fetchRoutes(page, pageSize);
+            } else {
+                throw new Error(`Ошибка обновления: ${res.status}`);
             }
-            const text = await response.text(); // "Route updated successfully"
-            console.log("Ответ на обновление маршрута:", text);
-
-            // Локально обновим
-            const updatedRoads = roads.map((r) => (r.id === currentRoad.id ? currentRoad : r));
-            setRoads(updatedRoads);
-            setFilteredRoads(updatedRoads);
-
-            closeEditPopup();
-        } catch (error) {
-            console.error("Ошибка при сохранении маршрута:", error);
+        } catch (e) {
+            console.error("Ошибка при обновлении маршрута:", e);
         }
-    }
+    };
 
-    // ================================
-    // 5) Удаление (DELETE /api/routes/{id})
-    // ================================
-    function openDeletePopup(road) {
-        setRoadToDelete(road);
-        setIsDeletePopupOpen(true);
-    }
-    function closeDeletePopup() {
-        setIsDeletePopupOpen(false);
-        setRoadToDelete(null);
-    }
+    const maxPages = Math.ceil(totalCount / pageSize);
 
-    async function confirmDelete() {
-        if (!roadToDelete) return;
-        try {
-            const token = localStorage.getItem("token");
-            const response = await fetch(`http://0.0.0.0:8080/api/routes/${roadToDelete.id}`, {
-                method: "DELETE",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                },
-            });
-            if (!response.ok) {
-                throw new Error(`Ошибка удаления маршрута: ${response.status}`);
-            }
-            const text = await response.text(); // "Success"
-            console.log("Удаление маршрута:", text);
-
-            const updated = roads.filter((r) => r.id !== roadToDelete.id);
-            setRoads(updated);
-            setFilteredRoads(updated);
-
-            closeDeletePopup();
-        } catch (error) {
-            console.error("Ошибка при удалении маршрута:", error);
-        }
-    }
-
-    // ================================
-    // Колонки таблицы
-    // ================================
     const columns = [
         { key: "id", label: "ID" },
         { key: "from", label: "From" },
@@ -288,175 +224,100 @@ export default function RoadsPage() {
         { key: "date", label: "Date" },
         { key: "time", label: "Time" },
         { key: "busId", label: "Bus ID" },
-        { key: "availableSeats", label: "Available Seats" },
+        { key: "availableSeats", label: "Seats" },
         { key: "price", label: "Price" },
+        {
+            key: "edit",
+            label: "Edit",
+            render: (road) => (
+                <button className="icon-btn edit-btn" onClick={() => handleEdit(road)}>✏️</button>
+            ),
+        },
+        {
+            key: "delete",
+            label: "Delete",
+            render: (road) => (
+                <button className="icon-btn delete-btn" onClick={() => setConfirmDeleteId(road.id)}>🗑️</button>
+            ),
+        },
     ];
 
     return (
         <div className="roads-page">
             <Sidebar />
             <div className="roads-content">
-                {/* Поля для server-side поиска */}
-                <div style={{ marginBottom:"10px" , marginTop: "100px", marginLeft: "350px"}}>
-                    <label style={{color: "white"}}>Departure:</label>
-                    <input
-                        type="text"
-                        value={searchDeparture}
-                        onChange={(e) => setSearchDeparture(e.target.value)}
-                        placeholder="Almaty"
-                    />
-                    <label style={{color: "white"}}>Destination:</label>
-                    <input
-                        type="text"
-                        value={searchDestination}
-                        onChange={(e) => setSearchDestination(e.target.value)}
-                        placeholder="Uzynagash"
-                    />
-                    <label style={{color: "white"}}>Date (YYYY-MM-DD):</label>
-                    <input
-                        type="text"
-                        value={searchDate}
-                        onChange={(e) => setSearchDate(e.target.value)}
-                        placeholder="2025-12-12"
-                    />
-                    <label style={{color: "white"}}>Passengers:</label>
-                    <input
-                        type="number"
-                        value={searchPassengers}
-                        onChange={(e) => setSearchPassengers(e.target.value)}
-                        placeholder="1"
-                    />
-                    <button onClick={handleFetchRoutesClick}>Search</button>
-                </div>
-
-                {/* Локальный поиск */}
                 <SearchBar onSearch={handleSearch} />
 
-                {/* Кнопка Add */}
-                <button className="add-route-btn" onClick={() => setIsAddPopupOpen(true)}>
-                    Add
-                </button>
+                <div className="pagination-controls">
+                    <label>Page:
+                        <input type="number" value={page} onChange={(e) => setPage(Number(e.target.value))} />
+                    </label>
+                    <label>Page Size:
+                        <input type="number" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} />
+                    </label>
+                    <button className="load-btn" onClick={() => fetchRoutes(page, pageSize)}>Load</button>
+                </div>
 
-                <Table
-                    data={filteredRoads}
-                    columns={columns}
-                    onEdit={openEditPopup}
-                    onDelete={openDeletePopup}
-                />
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button className="add-btn" onClick={() => setIsAddPopupOpen(true)}>Add</button>
+                </div>
+
+                <div className="table-container">
+                    <Table data={filteredRoads} columns={columns} />
+                </div>
+
+                <div className="pagination-buttons">
+                    <button onClick={() => { const newPage = Math.max(1, page - 1); setPage(newPage); fetchRoutes(newPage, pageSize); }} disabled={page <= 1}>⬅ Prev</button>
+                    <span className="page-info">Page {page}</span>
+                    <button onClick={() => { const newPage = Math.min(maxPages, page + 1); setPage(newPage); fetchRoutes(newPage, pageSize); }} disabled={page >= maxPages}>Next ➡</button>
+                </div>
+
+                {editRoute && (
+                    <div className="popup">
+                        <div className="popup-content">
+                            <h2>Edit Route</h2>
+                            <input value={editRoute.from} onChange={(e) => setEditRoute({ ...editRoute, from: e.target.value })} placeholder="From" />
+                            <input value={editRoute.departure_location} onChange={(e) => setEditRoute({ ...editRoute, departure_location: e.target.value })} placeholder="Departure Location" />
+                            <input value={editRoute.to} onChange={(e) => setEditRoute({ ...editRoute, to: e.target.value })} placeholder="To" />
+                            <input value={editRoute.destination_location} onChange={(e) => setEditRoute({ ...editRoute, destination_location: e.target.value })} placeholder="Destination Location" />
+                            <input value={editRoute.busId} onChange={(e) => setEditRoute({ ...editRoute, busId: e.target.value })} placeholder="Bus ID" />
+                            <input value={editRoute.date} onChange={(e) => setEditRoute({ ...editRoute, date: e.target.value })} placeholder="Date" />
+                            <input value={editRoute.time} onChange={(e) => setEditRoute({ ...editRoute, time: e.target.value })} placeholder="Time" />
+                            <input value={editRoute.price} onChange={(e) => setEditRoute({ ...editRoute, price: e.target.value })} placeholder="Price" />
+                            <button onClick={handleUpdate}>Save</button>
+                            <button onClick={() => setEditRoute(null)}>Cancel</button>
+                        </div>
+                    </div>
+                )}
+
+                {isAddPopupOpen && (
+                    <div className="popup">
+                        <div className="popup-content">
+                            <h2>Add New Route</h2>
+                            <input placeholder="From" value={newRoute.departure} onChange={(e) => setNewRoute({ ...newRoute, departure: e.target.value })} />
+                            <input placeholder="Departure Location" value={newRoute.departure_location} onChange={(e) => setNewRoute({ ...newRoute, departure_location: e.target.value })} />
+                            <input placeholder="To" value={newRoute.destination} onChange={(e) => setNewRoute({ ...newRoute, destination: e.target.value })} />
+                            <input placeholder="Destination Location" value={newRoute.destination_location} onChange={(e) => setNewRoute({ ...newRoute, destination_location: e.target.value })} />
+                            <input placeholder="Bus ID" value={newRoute.bus_id} onChange={(e) => setNewRoute({ ...newRoute, bus_id: e.target.value })} />
+                            <input placeholder="Start Date" value={newRoute.start_date} onChange={(e) => setNewRoute({ ...newRoute, start_date: e.target.value })} />
+                            <input placeholder="End Date" value={newRoute.end_date} onChange={(e) => setNewRoute({ ...newRoute, end_date: e.target.value })} />
+                            <input placeholder="Price" type="number" value={newRoute.price} onChange={(e) => setNewRoute({ ...newRoute, price: e.target.value })} />
+                            <button onClick={handleCreateRoute}>Create</button>
+                            <button onClick={() => setIsAddPopupOpen(false)}>Cancel</button>
+                        </div>
+                    </div>
+                )}
+
+                {confirmDeleteId && (
+                    <div className="popup">
+                        <div className="popup-content">
+                            <h3>Are you sure you want to delete this route?</h3>
+                            <button onClick={handleDelete}>Yes, delete</button>
+                            <button onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                        </div>
+                    </div>
+                )}
             </div>
-
-            {/* Попап Add */}
-            {isAddPopupOpen && (
-                <div className="popup">
-                    <div className="popup-content">
-                        <h2>Create Route</h2>
-                        <input
-                            type="text"
-                            placeholder="Bus ID"
-                            value={newRoad.bus_id}
-                            onChange={(e) => setNewRoad({ ...newRoad, bus_id: e.target.value })}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Departure"
-                            value={newRoad.departure}
-                            onChange={(e) => setNewRoad({ ...newRoad, departure: e.target.value })}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Destination"
-                            value={newRoad.destination}
-                            onChange={(e) => setNewRoad({ ...newRoad, destination: e.target.value })}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Start Date"
-                            value={newRoad.start_date}
-                            onChange={(e) => setNewRoad({ ...newRoad, start_date: e.target.value })}
-                        />
-                        <input
-                            type="text"
-                            placeholder="End Date"
-                            value={newRoad.end_date}
-                            onChange={(e) => setNewRoad({ ...newRoad, end_date: e.target.value })}
-                        />
-                        <input
-                            type="number"
-                            placeholder="Price"
-                            value={newRoad.price}
-                            onChange={(e) => setNewRoad({ ...newRoad, price: e.target.value })}
-                        />
-
-                        <button onClick={addRoute}>Save</button>
-                        <button onClick={closeAddPopup}>Cancel</button>
-                    </div>
-                </div>
-            )}
-
-            {/* Попап Edit */}
-            {isEditPopupOpen && currentRoad && (
-                <div className="popup">
-                    <div className="popup-content">
-                        <h2>Edit Route</h2>
-                        <input
-                            type="text"
-                            value={currentRoad.from}
-                            onChange={(e) => setCurrentRoad({ ...currentRoad, from: e.target.value })}
-                            placeholder="From"
-                        />
-                        <input
-                            type="text"
-                            value={currentRoad.to}
-                            onChange={(e) => setCurrentRoad({ ...currentRoad, to: e.target.value })}
-                            placeholder="To"
-                        />
-                        <input
-                            type="text"
-                            value={currentRoad.date}
-                            onChange={(e) => setCurrentRoad({ ...currentRoad, date: e.target.value })}
-                            placeholder="Date"
-                        />
-                        <input
-                            type="text"
-                            value={currentRoad.time}
-                            onChange={(e) => setCurrentRoad({ ...currentRoad, time: e.target.value })}
-                            placeholder="Time"
-                        />
-                        <input
-                            type="text"
-                            value={currentRoad.busId}
-                            onChange={(e) => setCurrentRoad({ ...currentRoad, busId: e.target.value })}
-                            placeholder="Bus ID"
-                        />
-                        <input
-                            type="text"
-                            value={currentRoad.availableSeats}
-                            onChange={(e) => setCurrentRoad({ ...currentRoad, availableSeats: e.target.value })}
-                            placeholder="Available Seats"
-                        />
-                        <input
-                            type="text"
-                            value={currentRoad.price}
-                            onChange={(e) => setCurrentRoad({ ...currentRoad, price: e.target.value })}
-                            placeholder="Price"
-                        />
-
-                        <button onClick={saveChanges}>Save</button>
-                        <button onClick={closeEditPopup}>Cancel</button>
-                    </div>
-                </div>
-            )}
-
-            {/* Попап Delete */}
-            {isDeletePopupOpen && roadToDelete && (
-                <div className="popup">
-                    <div className="popup-content">
-                        <h2>Are you sure you want to delete this route?</h2>
-                        <button onClick={confirmDelete}>Yes</button>
-                        <button onClick={closeDeletePopup}>Cancel</button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

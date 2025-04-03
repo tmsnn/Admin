@@ -9,40 +9,66 @@ export default function BusesPage() {
     const [filteredBuses, setFilteredBuses] = useState([]);
     const [isAddPopupOpen, setIsAddPopupOpen] = useState(false);
     const [newBus, setNewBus] = useState({ number: "", total_seats: "" });
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(30);
+    const [totalCount, setTotalCount] = useState(0);
+    const [busIdToDelete, setBusIdToDelete] = useState(null);
+    const [isDeletePopupOpen, setIsDeletePopupOpen] = useState(false);
+
 
     useEffect(() => {
-        fetchBuses();
+        fetchBuses(page, pageSize);
     }, []);
 
-    async function fetchBuses() {
+    async function fetchBuses(customPage = 1, customPageSize = 30) {
         try {
             const token = localStorage.getItem("token");
-            const response = await fetch("http://0.0.0.0:8080/api/buses", {
-                method: "GET",
+            const params = new URLSearchParams({
+                page: customPage,
+                pageSize: customPageSize,
+            });
+
+            const response = await fetch(`http://0.0.0.0:8080/api/buses?${params}`, {
                 headers: {
-                    "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`,
                 },
             });
 
             if (!response.ok) {
-                throw new Error(`Ошибка при получении автобусов: ${response.status}`);
+                throw new Error("Ошибка при получении автобусов");
             }
 
+            const total = parseInt(response.headers.get("X-Total-Count"), 10);
             const data = await response.json();
-            const busesList = Array.isArray(data[0]) ? data[0] : [];
 
-            const cleaned = busesList.map((bus) => ({
-                id: bus.id,
-                number: bus.number,
-                total_seats: bus.total_seats,
-            }));
-
-            setBuses(cleaned);
-            setFilteredBuses(cleaned);
+            setTotalCount(total || data.length);
+            setBuses(data);
+            setFilteredBuses(data);
         } catch (error) {
             console.error("Ошибка при загрузке автобусов:", error);
         }
+    }
+
+    const maxPages = Math.ceil(totalCount / pageSize);
+
+    function handleLoadClick() {
+        const finalPage = Number(page) || 1;
+        const finalSize = Number(pageSize) || 30;
+        setPage(finalPage);
+        setPageSize(finalSize);
+        fetchBuses(finalPage, finalSize);
+    }
+
+    function handlePrevPage() {
+        const newPage = Math.max(1, page - 1);
+        setPage(newPage);
+        fetchBuses(newPage, pageSize);
+    }
+
+    function handleNextPage() {
+        const newPage = Math.min(maxPages, page + 1);
+        setPage(newPage);
+        fetchBuses(newPage, pageSize);
     }
 
     async function addNewBus() {
@@ -60,39 +86,15 @@ export default function BusesPage() {
                 }),
             });
 
-            if (!response.ok) {
-                throw new Error(`Ошибка добавления автобуса: ${response.status}`);
-            }
+            if (!response.ok) throw new Error("Ошибка при добавлении автобуса");
 
             const created = await response.json();
-
-            const updated = [...buses, created];
-            setBuses(updated);
-            setFilteredBuses(updated);
-
+            setBuses((prev) => [...prev, created]);
+            setFilteredBuses((prev) => [...prev, created]);
             closeAddPopup();
         } catch (error) {
-            console.error("Ошибка при добавлении автобуса:", error);
+            console.error(error);
         }
-    }
-
-    function handleSearch(query) {
-        if (!query) {
-            setFilteredBuses(buses);
-            return;
-        }
-
-        const lowerQuery = query.toLowerCase();
-        const filtered = buses.filter((bus) =>
-            Object.values(bus).some((val) =>
-                val?.toString().toLowerCase().includes(lowerQuery)
-            )
-        );
-        setFilteredBuses(filtered);
-    }
-
-    function openAddPopup() {
-        setIsAddPopupOpen(true);
     }
 
     function closeAddPopup() {
@@ -100,24 +102,135 @@ export default function BusesPage() {
         setNewBus({ number: "", total_seats: "" });
     }
 
+    function confirmDeleteBus(busId) {
+        setBusIdToDelete(busId);
+        setIsDeletePopupOpen(true);
+    }
+
+    async function handleDeleteBus() {
+        if (!busIdToDelete) return;
+
+        try {
+            const token = localStorage.getItem("token");
+            await fetch(`http://0.0.0.0:8080/api/buses/${busIdToDelete}`, {
+                method: "DELETE",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                },
+            });
+
+            const updated = buses.filter((bus) => bus.id !== busIdToDelete);
+            setBuses(updated);
+            setFilteredBuses(updated);
+            setIsDeletePopupOpen(false);
+            setBusIdToDelete(null);
+        } catch (error) {
+            console.error("Ошибка при удалении автобуса:", error);
+        }
+    }
+
+
+    async function handleSearch(query) {
+        if (!query) {
+            setFilteredBuses(buses);
+            return;
+        }
+
+        const localFiltered = buses.filter((bus) =>
+            Object.values(bus).some((val) =>
+                val?.toString().toLowerCase().includes(query.toLowerCase())
+            )
+        );
+
+        if (localFiltered.length > 0) {
+            setFilteredBuses(localFiltered);
+        } else {
+            try {
+                const token = localStorage.getItem("token");
+                const response = await fetch(`http://0.0.0.0:8080/api/buses/${query}`, {
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                    },
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    setFilteredBuses([result]);
+                } else {
+                    setFilteredBuses([]);
+                }
+            } catch {
+                setFilteredBuses([]);
+            }
+        }
+    }
+
     const columns = [
         { key: "id", label: "ID" },
         { key: "number", label: "Number" },
         { key: "total_seats", label: "Total Seats" },
+        {
+            key: "delete",
+            label: "Delete",
+            render: (bus) => (
+                <button
+                    onClick={() => confirmDeleteBus(bus.id)}
+                    className="icon-btn delete-btn"
+                >
+                    🗑️
+                </button>
+            ),
+        }
     ];
 
     return (
         <div className="buses-page">
             <Sidebar />
-            <div className="buses-content">
-                <SearchBar onSearch={handleSearch} />
+            <div className="main-content">
+                <div className="search-wrapper">
+                    <SearchBar onSearch={handleSearch} />
+                </div>
 
-                <button className="add-bus-btn" onClick={openAddPopup}>
+                <div className="pagination-controls">
+                    <label>
+                        Page:
+                        <input
+                            type="number"
+                            min={1}
+                            value={page}
+                            onChange={(e) => setPage(Number(e.target.value))}
+                        />
+                    </label>
+                    <label>
+                        Page Size:
+                        <input
+                            type="number"
+                            min={1}
+                            value={pageSize}
+                            onChange={(e) => setPageSize(Number(e.target.value))}
+                        />
+                    </label>
+                    <button className="load-btn" onClick={handleLoadClick}>
+                        Load
+                    </button>
+                </div>
+
+                <button className="add-bus-btn" onClick={() => setIsAddPopupOpen(true)}>
                     Add
                 </button>
 
                 <div className="table-container">
                     <Table data={filteredBuses} columns={columns} />
+                </div>
+
+                <div className="pagination-buttons">
+                    <button onClick={handlePrevPage} disabled={page <= 1}>
+                        ⬅ Previous
+                    </button>
+                    <span className="page-info">Page {page}</span>
+                    <button onClick={handleNextPage} disabled={page >= maxPages}>
+                        Next ➡
+                    </button>
                 </div>
             </div>
 
@@ -146,6 +259,17 @@ export default function BusesPage() {
                     </div>
                 </div>
             )}
+
+            {isDeletePopupOpen && (
+                <div className="popup">
+                    <div className="popup-content">
+                        <h3>Are you sure you want to delete this bus?</h3>
+                        <button onClick={handleDeleteBus}>Yes, delete</button>
+                        <button onClick={() => setIsDeletePopupOpen(false)}>Cancel</button>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }

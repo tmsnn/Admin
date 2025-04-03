@@ -3,7 +3,6 @@ import "../styles/Table.css";
 
 const Table = ({ data, columns }) => {
     return (
-        <div className="table-container">
             <table className="main-table">
                 <thead>
                 <tr>
@@ -25,7 +24,6 @@ const Table = ({ data, columns }) => {
                 ))}
                 </tbody>
             </table>
-        </div>
     );
 };
 

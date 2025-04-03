@@ -6,7 +6,8 @@
 .settings-content {
     flex: 1;
     padding: 20px;
-    background-color: #363a2f; /* Твой тёмный фон */
+    background-color: #363a2f; /* Тёмный фон */
+    overflow-y: auto;
 }
 
 .settings-sections {
@@ -15,15 +16,17 @@
 
 .settings-section {
     background: white;
-    padding: 10px 15px;
+    padding: 15px 20px;
     margin-left: 300px;
     width: 60%;
-    margin-bottom: 10px;
-    border-radius: 8px;
-    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     font-family: "Arial", sans-serif;
     font-size: 14px;
     color: #333;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .section-header {
@@ -48,20 +51,27 @@
 .section-content {
     margin-top: 10px;
     white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.6;
 }
 
 textarea {
     width: 100%;
-    height: 100px;
-    padding: 5px;
+    min-height: 100px;
+    padding: 10px;
     font-size: 14px;
     border: 1px solid #ccc;
-    border-radius: 5px;
-    margin-bottom: 10px;
+    border-radius: 6px;
+    resize: vertical;
+    box-sizing: border-box;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .edit-buttons {
     display: flex;
     gap: 10px;
+    margin-top: 10px;
 }
-

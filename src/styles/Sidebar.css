@@ -25,6 +25,8 @@
     margin: 15px 0;
 }
 
+
+
 .sidebar-menu a {
     text-decoration: none;
     color: black;
@@ -53,4 +55,26 @@
 .logout a {
     color: red;
     font-weight: bold;
+}
+
+.logout-btn {
+    width: 80px;
+    background-color: #3b452d;
+    color: white;
+    font-weight: bold;
+    border: none;
+    padding: 6px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    margin-top: 430px;
+    margin-left: 80px;
+}
+
+.logout-btn:hover {
+    background-color: #e03e3e;
+}
+
+.logo-text {
+    margin-left: 30px;
 }
